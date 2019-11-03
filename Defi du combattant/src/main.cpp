@@ -7,12 +7,13 @@ bool ROBUS_IsBumper(uint8_t id);
 int32_t ENCODER_Read(uint8_t id);
 
 int CalculerAngleDepart(int *sensAngle, int AngleInitial, int couleur);
+float LireDistance();
 
 void defiParcours();
 
 //void acceleration(void);
-void mouvement(float dist);
-void tourne(int dir, int Angle);
+void Mouvement(float dist);
+void Tourner(int dir, int Angle);
 float FonctionPID(float distMotDroite, float distMotGauche); 
 
 #define ANGLE_INITIAL_ROBOT_A 90
@@ -62,7 +63,7 @@ void loop()
 
   if(ROBUS_IsBumper(3))
   {
-    mouvement(DISTANCE_DU_CENTRE);
+    Mouvement(DISTANCE_DU_CENTRE);
 
     int sensAngleDepart = 1;
 
@@ -71,12 +72,12 @@ void loop()
 
     int angleDepart = CalculerAngleDepart(&sensAngleDepart, angleInitial, couleur);
 
-    tourne(sensAngleDepart, angleDepart);
+    Tourner(sensAngleDepart, angleDepart);
   }
 }
 
 //Calcule l'angle le plus court que peut faire le robot en fonction de son angle initial et de la couleur qu'il veut atteindre
-int CalculerAngleDepart(int *sensAngle, int angleInitial, int couleur)
+int calculerAngleDepart(int *sensAngle, int angleInitial, int couleur)
 {
   int angle = TableauAnglesCouleurs[couleur] - angleInitial;
   *sensAngle = 1;
@@ -96,7 +97,26 @@ int CalculerAngleDepart(int *sensAngle, int angleInitial, int couleur)
   return angle;
 }
 
-void tourne(int dir, int Angle) //dir = -1 pour tourner a gauche et dir = 1 pour tourner à droite
+float LireDistance()
+{
+  float brut = ROBUS_ReadIR(0) / 200.0;
+  Serial.println(brut);
+  Serial.println(analogRead(0));
+  double distance, step1, step2, step3;
+  step1 = (brut - 49.8115) / (brut - 0.230724);
+  step2 = 0.679454 * -1 * step1;
+  step3 = pow(step2, 0.899171);
+  
+  /*Serial.print("\n"); Serial.print(step1);
+  Serial.print("\n"); Serial.print(step2);
+  Serial.print("\n"); Serial.print(step3);*/
+
+  distance = pow(0.679454 * -1 * ((brut-49.8115) / (brut - 0.230724)), (125000.0 / 139017.0));
+
+  return distance;
+  }
+
+void Tourner(int dir, int Angle) //dir = -1 pour tourner a gauche et dir = 1 pour tourner à droite
 {
   AngleActuel = 0;
 
@@ -134,7 +154,7 @@ void tourne(int dir, int Angle) //dir = -1 pour tourner a gauche et dir = 1 pour
 }
 
 
-void mouvement(float dist)
+void Mouvement(float dist)
 { 
   double accel = 0;
   double distAccel = 30;
@@ -196,9 +216,9 @@ float FonctionPID(float distMotDroite, float distMotGauche)
   float kp = 0.001;
   float ki = 0.002;
   float diffDist = 0;
-  float P = 0; // P = Produit de la différence dans un PID
+  float P = 0; // P = Produit de la difference dans un PID
   float diffDistTotal = 0;
-  float I = 0; // I = Intégrale de la différence dans un PID
+  float I = 0; // I = Integrale de la difference dans un PID
   float vitMot1 = 0;
   float distMD = 0;
   float distMG = 0;
@@ -222,40 +242,40 @@ float FonctionPID(float distMotDroite, float distMotGauche)
 void defiParcours()
 {
     //Aller
-    mouvement(230);
-    tourne(-1, 88);
-    mouvement(100);
-    tourne(1, 85);
-    mouvement(45);
-    tourne(1, 85);
-    mouvement(55);
-    tourne(-1,88);
-    mouvement(105);
-    tourne(1,85);
-    mouvement(60);
-    tourne(-1, 81);
-    mouvement(122.5);
+    Mouvement(230);
+    Tourner(-1, 88);
+    Mouvement(100);
+    Tourner(1, 85);
+    Mouvement(45);
+    Tourner(1, 85);
+    Mouvement(55);
+    Tourner(-1,88);
+    Mouvement(105);
+    Tourner(1,85);
+    Mouvement(60);
+    Tourner(-1, 81);
+    Mouvement(122.5);
 
     //Ballon
-    tourne(-1, 177);
-    mouvement(225);
-    tourne(-1, 177);
+    Tourner(-1, 177);
+    Mouvement(225);
+    Tourner(-1, 177);
 
     //Retour
-    mouvement(95);
-    tourne(-1,88);
-    mouvement(50);
-    tourne(-1,88);
-    mouvement(105);
-    tourne(1,85);
-    mouvement(55);
-    tourne(-1,88);
-    mouvement(45);
-    tourne(-1,88);
-    mouvement(100);
-    tourne(1,88);
-    mouvement(245);
-    tourne(-1,720);
+    Mouvement(95);
+    Tourner(-1,88);
+    Mouvement(50);
+    Tourner(-1,88);
+    Mouvement(105);
+    Tourner(1,85);
+    Mouvement(55);
+    Tourner(-1,88);
+    Mouvement(45);
+    Tourner(-1,88);
+    Mouvement(100);
+    Tourner(1,88);
+    Mouvement(245);
+    Tourner(-1,720);
 }
 
 /* 
