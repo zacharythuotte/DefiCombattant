@@ -1,10 +1,10 @@
 #include <Arduino.h>
 #include <LibRobus.h>
 
-void MOTOR_SetSpeed(uint8_t id, float speed);
-void SERVO_Enable(uint8_t id);
-bool ROBUS_IsBumper(uint8_t id);
-int32_t ENCODER_Read(uint8_t id);
+// void MOTOR_SetSpeed(uint8_t id, float speed);
+// void SERVO_Enable(uint8_t id);
+// bool ROBUS_IsBumper(uint8_t id);
+// int32_t ENCODER_Read(uint8_t id);
 
 int CalculerAngleDepart(int *sensAngle, int AngleInitial, int couleur);
 float LireDistance();
@@ -19,7 +19,9 @@ float FonctionPID(float distMotDroite, float distMotGauche);
 #define ANGLE_INITIAL_ROBOT_A 90
 #define ANGLE_INITIAL_ROBOT_B 270
 
-#define DISTANCE_DU_CENTRE 30 //La distance initiale entre les roues et le centre de l arene en cm
+#define DISTANCE_DU_CENTRE 36.5 //La distance initiale entre les roues et le centre de l arene en cm
+#define DISTANCE_EXTREMITE_BALLON 38 //
+#define RAYON_CERLCE_CENTRE 15
 
 #define ROUGE 0
 #define VERT 1
@@ -31,6 +33,8 @@ float FonctionPID(float distMotDroite, float distMotGauche);
 #define ANGLE_BLEU 225
 #define ANGLE_JAUNE 315
 int TableauAnglesCouleurs[4] = {ANGLE_ROUGE, ANGLE_VERT, ANGLE_BLEU, ANGLE_JAUNE};
+
+float facteurAcceleration;
 
 int Start = 0;
 int Bumper3 = 0;
@@ -63,21 +67,52 @@ void loop()
 
   if(ROBUS_IsBumper(3))
   {
-    Mouvement(DISTANCE_DU_CENTRE);
+    int angleInitial = ANGLE_INITIAL_ROBOT_A;
+    int couleurAAtteindre = BLEU;
+
+    //1. Descendre les fourches
+    SERVO_SetAngle(0, 0);
+
+    //2. Avancer jusquau centre
+    facteurAcceleration = 0.4;
+    Mouvement(DISTANCE_DU_CENTRE); //Descendre la vitesse du premier mouvement
+
+    //3. Monter les fourches
+    SERVO_SetAngle(0, 120);
 
     int sensAngleDepart = 1;
 
-    int angleInitial = ANGLE_INITIAL_ROBOT_A;
-    int couleur = ROUGE;
+    int angleDepart = CalculerAngleDepart(&sensAngleDepart, angleInitial, couleurAAtteindre);
 
-    int angleDepart = CalculerAngleDepart(&sensAngleDepart, angleInitial, couleur);
-
+    //4. Tourner dans la bonne direction
     Tourner(sensAngleDepart, angleDepart);
+
+    //5. Sortir du cercle
+    facteurAcceleration = 0.4;
+    Mouvement(RAYON_CERLCE_CENTRE);
+
+    //6. Detecter et suivre la ligne
+    
+    //7. Arreter quand il detecte une couleur
+  }
+
+  // if(ROBUS_IsBumper(0))
+  // {
+  //   SERVO_SetAngle(0, 0);
+  // }
+  // if(ROBUS_IsBumper(1))
+  // {
+  //   SERVO_SetAngle(0, 90);
+  // }
+
+  if(ROBUS_IsBumper(0))
+  {
+    LireDistance();
   }
 }
 
 //Calcule l'angle le plus court que peut faire le robot en fonction de son angle initial et de la couleur qu'il veut atteindre
-int calculerAngleDepart(int *sensAngle, int angleInitial, int couleur)
+int CalculerAngleDepart(int *sensAngle, int angleInitial, int couleur)
 {
   int angle = TableauAnglesCouleurs[couleur] - angleInitial;
   *sensAngle = 1;
@@ -112,6 +147,7 @@ float LireDistance()
   Serial.print("\n"); Serial.print(step3);*/
 
   distance = pow(0.679454 * -1 * ((brut-49.8115) / (brut - 0.230724)), (125000.0 / 139017.0));
+  Serial.print("Distance : "); Serial.print(distance);
 
   return distance;
   }
@@ -168,29 +204,28 @@ void Mouvement(float dist)
     {
       if(Distactuel < dist/2)
       {
-        accel = (Distactuel / distAccel)*0.8;
+        accel = (Distactuel / distAccel) * facteurAcceleration;
        //Serial.println("1");
       }
       else
-
       {
-        accel = ((dist-Distactuel)/distAccel)*0.8;
+        accel = ((dist-Distactuel)/distAccel) * facteurAcceleration;
         //Serial.println("2");
       }
     }
     else if(Distactuel < distAccel)
     {
-      accel = (Distactuel / distAccel)*0.8 ;
+      accel = (Distactuel / distAccel) * facteurAcceleration;
       //Serial.println("3");
     }
     else if(dist-Distactuel <= distAccel)
     {
-      accel = ((dist-Distactuel)/distAccel)*0.8 ;
+      accel = ((dist-Distactuel)/distAccel) * facteurAcceleration;
       //Serial.println("4");
     }
     else
     {
-      accel = 0.8;
+      accel = facteurAcceleration;
     }
     EncoderG=ENCODER_Read(0);
     EncoderD=ENCODER_Read(1);
