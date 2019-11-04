@@ -64,15 +64,18 @@ int32_t EncoderD = 0;
 float distTotMotDroite = 0;
 float distTotMotGauche = 0;
 
-void setup() {
+void setup() 
+{
   // put your setup code here, to run once:
   BoardInit();
   Serial.begin(9600);
-  if (tcs.begin()) {
+  if (tcs.begin())
+  {
     Serial.println("Found sensor");
-  } else {
+  } 
+  else 
+  {
     Serial.println("No TCS34725 found ... check your connections");
-    while (1); // halt!
   }
   pinMode(redpin, OUTPUT);
   pinMode(greenpin, OUTPUT);
@@ -88,7 +91,7 @@ void loop()
 
   if(ROBUS_IsBumper(3))
   {
-    int angleInitial = ANGLE_INITIAL_ROBOT_A;
+    int angleInitial = ANGLE_INITIAL_ROBOT_B;
     int couleurAAtteindre = JAUNE;
 
     //1. Descendre les fourches
@@ -113,12 +116,17 @@ void loop()
     Mouvement(RAYON_CERLCE_CENTRE);
 
     //6. Detecter et suivre la ligne
-
+    
+    while(couleurAAtteindre != lireCouleur())
+    {
+      Suivre();
+    }
     
     //7. Arreter quand il detecte une couleur
 
 
   }
+
   if(ROBUS_IsBumper(2))
   {
      int couleur = lireCouleur();
@@ -146,18 +154,16 @@ void loop()
    {
      Serial.println("couleur battard");
    }
-   
-
   }
 
-  // if(ROBUS_IsBumper(0))
-  // {
-  //   SERVO_SetAngle(0, 0);
-  // }
-  // if(ROBUS_IsBumper(1))
-  // {
-  //   SERVO_SetAngle(0, 90);
-  // }
+  if(ROBUS_IsBumper(0))
+  {
+    SERVO_SetAngle(0, 0);
+  }
+  if(ROBUS_IsBumper(1))
+  {
+    SERVO_SetAngle(0, 90);
+  }
 
   if(ROBUS_IsBumper(0))
   {
@@ -234,7 +240,6 @@ void Tourner(int dir, int Angle) //dir = -1 pour tourner a gauche et dir = 1 pou
 
   delay(50);
 }
-
 
 void Mouvement(float dist)
 { 
@@ -319,6 +324,7 @@ float FonctionPID(float distMotDroite, float distMotGauche)
 
   return vitMot1;
 }
+
 int lireCouleur()
 {
  uint16_t clear, red, green, blue;
@@ -402,6 +408,59 @@ void defiParcours()
     Tourner(-1,720);
 }
 
+//Fonction suiveur de ligne
+void Suivre()
+{
+  float Capteur = analogRead(0); // Mettre la fonction pour lire la valeur analogique du suiveur.
+  Serial.println("Capteur : "); Serial.print(Capteur);
+
+  if(Capteur >= 5) //Modifier avec les valeurs obtenues sur le montage.
+  {
+    MOTOR_SetSpeed(0, -0.5); // Faire des tests pour voir quel angle fonctionne mieux. Austement.Mettre le bon nom de fonction.
+    MOTOR_SetSpeed(1,0); // 111 -> Pas de ligne
+  }
+  else if(Capteur >= 4.28) //110 -> Tourne a gauche
+  {
+    MOTOR_SetSpeed(0,-0.3); //Gauche
+    MOTOR_SetSpeed(1,0.7); //Droite
+  }
+  else if(Capteur >= 3.57) //101 -> Avance
+  {
+    MOTOR_SetSpeed(0,0.7); 
+    MOTOR_SetSpeed(1,0.7);
+  }
+  else if(Capteur >= 2.86) //100 -> Tourne a gauche un peu
+  {
+    MOTOR_SetSpeed(0,0.3); 
+    MOTOR_SetSpeed(1,0.7);
+  }
+  else if(Capteur >= 2.14) //011 -> Tourne a droite
+  {
+    MOTOR_SetSpeed(0,0.7); 
+    MOTOR_SetSpeed(1,-0.3);
+  }
+  else if(Capteur >= 1.42) //010 -> Intersection tourne a droite
+  {
+    MOTOR_SetSpeed(0,0.7); 
+    MOTOR_SetSpeed(1,0.3);
+  }
+  else if(Capteur >= 0.72) //001 -> Tourne a droite un peu
+  {
+    MOTOR_SetSpeed(0,0.7); 
+    MOTOR_SetSpeed(1,0.3);
+  }
+  else if(Capteur >= 0) //000 -> Intersection milieu stop prendre une decision. peut etre ajouter return.
+  {
+    MOTOR_SetSpeed(0,0); 
+    MOTOR_SetSpeed(1,0);
+  }
+  else //Par defaut
+  {
+    MOTOR_SetSpeed(0,0.5); 
+    MOTOR_SetSpeed(1,0.5);
+  }
+}
+
 /* 
 void acceleration(void)
 {
@@ -467,7 +526,7 @@ void acceleration(void)
           MOTOR_SetSpeed(0, VitesseactuelD2); // Moteur gauche
           MOTOR_SetSpeed(1, VitesseactuelD2); // Moteur droit
         }
-      } 
+      }
 
   if(Bumper2)
   {
