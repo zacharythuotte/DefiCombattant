@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <LibRobus.h>
+#include "Adafruit_TCS34725.h"
 
 // void MOTOR_SetSpeed(uint8_t id, float speed);
 // void SERVO_Enable(uint8_t id);
@@ -27,12 +28,23 @@ float FonctionPID(float distMotDroite, float distMotGauche);
 #define VERT 1
 #define BLEU 2
 #define JAUNE 3
+#define NOIR 4
 
 #define ANGLE_ROUGE 45
 #define ANGLE_VERT 135
 #define ANGLE_BLEU 225
 #define ANGLE_JAUNE 315
+
+#define redpin 3
+#define greenpin 5
+#define bluepin 6
+
+#define commonAnode true
+
 int TableauAnglesCouleurs[4] = {ANGLE_ROUGE, ANGLE_VERT, ANGLE_BLEU, ANGLE_JAUNE};
+int lireCouleur();
+float lireDistance();
+Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X);
 
 float facteurAcceleration;
 
@@ -56,6 +68,15 @@ void setup() {
   // put your setup code here, to run once:
   BoardInit();
   Serial.begin(9600);
+  if (tcs.begin()) {
+    Serial.println("Found sensor");
+  } else {
+    Serial.println("No TCS34725 found ... check your connections");
+    while (1); // halt!
+  }
+  pinMode(redpin, OUTPUT);
+  pinMode(greenpin, OUTPUT);
+  pinMode(bluepin, OUTPUT);
   delay(1500);
   MOTOR_SetSpeed(0, 0); // Moteur gauche
   MOTOR_SetSpeed(1, 0); // Moteur droit
@@ -68,10 +89,11 @@ void loop()
   if(ROBUS_IsBumper(3))
   {
     int angleInitial = ANGLE_INITIAL_ROBOT_A;
-    int couleurAAtteindre = BLEU;
+    int couleurAAtteindre = JAUNE;
 
     //1. Descendre les fourches
     SERVO_SetAngle(0, 0);
+    delay(500);
 
     //2. Avancer jusquau centre
     facteurAcceleration = 0.4;
@@ -79,21 +101,53 @@ void loop()
 
     //3. Monter les fourches
     SERVO_SetAngle(0, 120);
-
-    int sensAngleDepart = 1;
-
-    int angleDepart = CalculerAngleDepart(&sensAngleDepart, angleInitial, couleurAAtteindre);
+    delay(2000);
 
     //4. Tourner dans la bonne direction
+    int sensAngleDepart = 1;
+    int angleDepart = CalculerAngleDepart(&sensAngleDepart, angleInitial, couleurAAtteindre);
     Tourner(sensAngleDepart, angleDepart);
 
     //5. Sortir du cercle
-    facteurAcceleration = 0.4;
+    facteurAcceleration = 0.8;
     Mouvement(RAYON_CERLCE_CENTRE);
 
     //6. Detecter et suivre la ligne
+
     
     //7. Arreter quand il detecte une couleur
+
+
+  }
+  if(ROBUS_IsBumper(2))
+  {
+     int couleur = lireCouleur();
+  if(couleur==0)
+  {
+    Serial.println("ROUGE");
+  }
+  else if(couleur==1)
+  {
+    Serial.println("VERT");
+  }
+   else if(couleur==2)
+   {
+      Serial.println("BLEU");
+   }
+  else  if(couleur==3)
+   {
+     Serial.println("JAUNE");
+   }
+   else if(couleur==4)
+   {
+     Serial.println("noir");
+   }
+   else
+   {
+     Serial.println("couleur battard");
+   }
+   
+
   }
 
   // if(ROBUS_IsBumper(0))
@@ -135,17 +189,9 @@ int CalculerAngleDepart(int *sensAngle, int angleInitial, int couleur)
 float LireDistance()
 {
   float brut = ROBUS_ReadIR(0) / 200.0;
+  float distance;
   Serial.println(brut);
   Serial.println(analogRead(0));
-  double distance, step1, step2, step3;
-  step1 = (brut - 49.8115) / (brut - 0.230724);
-  step2 = 0.679454 * -1 * step1;
-  step3 = pow(step2, 0.899171);
-  
-  /*Serial.print("\n"); Serial.print(step1);
-  Serial.print("\n"); Serial.print(step2);
-  Serial.print("\n"); Serial.print(step3);*/
-
   distance = pow(0.679454 * -1 * ((brut-49.8115) / (brut - 0.230724)), (125000.0 / 139017.0));
   Serial.print("Distance : "); Serial.print(distance);
 
@@ -272,6 +318,49 @@ float FonctionPID(float distMotDroite, float distMotGauche)
   distTotMotGauche = distMotGauche;
 
   return vitMot1;
+}
+int lireCouleur()
+{
+ uint16_t clear, red, green, blue;
+ tcs.setInterrupt(false);
+ tcs.getRawData(&red,&green,&blue,&clear);
+ tcs.setInterrupt(true);
+ float r,g,b, sum;
+ sum = clear;
+ r = red / sum;
+ g = green / sum;
+ b = blue / sum;
+ r = r*256.0;
+ b = b*256.0;
+ g = g*256.0;
+ /*Serial.print("\tR:\t");   Serial.print((int)red);
+ Serial.print("\tg:\t");   Serial.print((int)green);
+ Serial.print("\tb:\t");   Serial.print((int)blue);
+ Serial.print("\tclear:\t");   Serial.print((int)clear);
+ Serial.println();*/
+
+if(clear<650)
+  {
+    return 4;
+  }
+ if(r>95 && r<125 && g>55 && g<75 && b>55 && b<85)
+  {
+    return 0;
+  }
+  if(r>40 && r<60 && g>85 && g<105 && b>80 && b<100)
+  {
+    return 1;
+  }
+  if(r>30 && r<50 && g>70 && g<90 && b>100 && b<130)
+  {
+    return 2;
+  }
+  if(r>90 && r<130 && g>80 && g<100 && b>40 && b<60)
+  {
+    return 3;
+  }
+  
+  return -1;
 }
 
 void defiParcours()
