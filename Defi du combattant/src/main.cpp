@@ -8,7 +8,8 @@
 // int32_t ENCODER_Read(uint8_t id);
 
 int CalculerAngleDepart(int *sensAngle, int AngleInitial, int couleur);
-float LireDistance();
+float LireDistance(int capteur);
+int TrouverBallon(int *angleTourne);
 
 void defiParcours();
 
@@ -20,8 +21,8 @@ float FonctionPID(float distMotDroite, float distMotGauche);
 #define ANGLE_INITIAL_ROBOT_A 90
 #define ANGLE_INITIAL_ROBOT_B 270
 
-#define DISTANCE_DU_CENTRE 36.5 //La distance initiale entre les roues et le centre de l arene en cm
-#define DISTANCE_EXTREMITE_BALLON 38 //
+#define DISTANCE_DU_CENTRE 40 //La distance initiale entre les roues et le centre de l arene en cm
+#define DISTANCE_CENTRE_BALLON 115 //
 #define RAYON_CERLCE_CENTRE 15
 
 #define ROUGE 0
@@ -64,6 +65,8 @@ int32_t EncoderD = 0;
 float distTotMotDroite = 0;
 float distTotMotGauche = 0;
 
+float vitesseTourner = 0.2;
+
 void setup() 
 {
   // put your setup code here, to run once:
@@ -87,88 +90,193 @@ void setup()
 
 void loop() 
 {
-  // put your main code here, to run repeatedly:
+    // put your main code here, to run repeatedly:
 
   if(ROBUS_IsBumper(3))
   {
     int angleInitial = ANGLE_INITIAL_ROBOT_B;
-    int couleurAAtteindre = JAUNE;
+    int couleurAAtteindre = ROUGE;
+    int couleur2 = JAUNE;
 
-    //1. Descendre les fourches
-    SERVO_SetAngle(0, 0);
-    delay(500);
-
-    //2. Avancer jusquau centre
-    facteurAcceleration = 0.4;
-    Mouvement(DISTANCE_DU_CENTRE); //Descendre la vitesse du premier mouvement
-
-    //3. Monter les fourches
-    SERVO_SetAngle(0, 120);
-    delay(2000);
-
-    //4. Tourner dans la bonne direction
-    int sensAngleDepart = 1;
-    int angleDepart = CalculerAngleDepart(&sensAngleDepart, angleInitial, couleurAAtteindre);
-    Tourner(sensAngleDepart, angleDepart);
-
-    //5. Sortir du cercle
-    facteurAcceleration = 0.8;
-    Mouvement(RAYON_CERLCE_CENTRE);
-
-    //6. Detecter et suivre la ligne
-    
-    while(couleurAAtteindre != lireCouleur())
+    if(angleInitial == ANGLE_INITIAL_ROBOT_A)
     {
-      Suivre();
-    }
+      //1. Monter les fourches
+      SERVO_SetAngle(0, 170);
+      delay(1000);
+
+      //2. Avancer jusquau centre
+      facteurAcceleration = 0.4;
+      Mouvement(DISTANCE_DU_CENTRE); //Descendre la vitesse du premier mouvement
+
+      //3. Tourner dans la bonne direction
+      int sensAngleDepart = 1;
+      int angleDepart = CalculerAngleDepart(&sensAngleDepart, angleInitial, couleurAAtteindre);
+      Tourner(sensAngleDepart, angleDepart);
+
+      //4. Se rendre avant le ballon
+      facteurAcceleration = 0.8;
+      Mouvement(DISTANCE_CENTRE_BALLON - 20);
+
+      //5. Descendre les fourches
+      SERVO_SetAngle(0, 0);
+      delay(1000);
+
+      //6. Se rendre jusquau ballon
+      facteurAcceleration = 0.2;
+      Mouvement(20);
     
-    //7. Arreter quand il detecte une couleur
+      //7. Monter les fourches
+      SERVO_SetAngle(0, 120);
+      delay(1000);
 
+      //8.
+      Tourner(1, 180);
 
-  }
+      //9. Retourner au centre
+      facteurAcceleration = 0.8;
+      Mouvement(DISTANCE_CENTRE_BALLON - RAYON_CERLCE_CENTRE - 10);
 
-  if(ROBUS_IsBumper(2))
-  {
-     int couleur = lireCouleur();
-  if(couleur==0)
-  {
-    Serial.println("ROUGE");
+      //10. Deposer ballon
+      SERVO_SetAngle(0, 0);
+      delay(1000);
+
+      //11.
+      MOTOR_SetSpeed(0, -0.3);
+      MOTOR_SetSpeed(1, -0.3);
+      delay(1500);
+      MOTOR_SetSpeed(0, 0);
+      MOTOR_SetSpeed(1, 0);
+
+      //12. 
+      Tourner(1, 110);
+
+      //13.
+      Mouvement(40);
+    }
+    else if(angleInitial == ANGLE_INITIAL_ROBOT_B)
+    {
+      //delay(60*1000);
+
+      //1. Descendre les fourches
+      SERVO_SetAngle(0, 30);
+      delay(1000);
+
+      //2.Trouver le ballon
+      int angleTrouverBallon;
+      float distanceBallon = TrouverBallon(&angleTrouverBallon);
+
+      //3. Avancer jusquau centre
+      facteurAcceleration = 0.1; //Descendre la vitesse du premier mouvement
+      Mouvement(distanceBallon - 5);
+
+      //3. Monter les fourches
+      SERVO_SetAngle(0, 120);
+      delay(1000);
+
+      Serial.println("angleTrouverBallon"); Serial.println(angleTrouverBallon);
+
+      //Corrige son angle du TrouverBallon
+      if(angleTrouverBallon > 40)
+      {
+        Tourner(-1, angleTrouverBallon - 37);
+      }
+      else if (angleTrouverBallon < 20) //else if(angleTrouverBallon <= 45)
+      {
+        Tourner(1, 37 - angleTrouverBallon);
+      }
+      delay(500);
+
+      //4. Tourner dans la bonne direction
+      int sensAngleDepart = 1;
+      int angleDepart = CalculerAngleDepart(&sensAngleDepart, angleInitial, couleur2);
+      Tourner(sensAngleDepart, angleDepart);
+
+      //5. Sortir du cercle
+      facteurAcceleration = 0.8;
+      Mouvement(DISTANCE_CENTRE_BALLON);
+
+      //3. dROP les fourches
+      SERVO_SetAngle(0, 0);
+      delay(1000);
+    }
   }
-  else if(couleur==1)
-  {
-    Serial.println("VERT");
-  }
-   else if(couleur==2)
-   {
-      Serial.println("BLEU");
-   }
-  else  if(couleur==3)
-   {
-     Serial.println("JAUNE");
-   }
-   else if(couleur==4)
-   {
-     Serial.println("noir");
-   }
-   else
-   {
-     Serial.println("couleur battard");
-   }
-  }
+  // if(ROBUS_IsBumper(2))
+  // {
+  //    int couleur = lireCouleur();
+  // if(couleur==0)
+  // {
+  //   Serial.println("ROUGE");
+  // }
+  // else if(couleur==1)
+  // {
+  //   Serial.println("VERT");
+  // }
+  //  else if(couleur==2)
+  //  {
+  //     Serial.println("BLEU");
+  //  }
+  // else  if(couleur==3)
+  //  {
+  //    Serial.println("JAUNE");
+  //  }
+  //  else if(couleur==4)
+  //  {
+  //    Serial.println("noir");
+  //  }
+  //  else
+  //  {
+  //    Serial.println("couleur battard");
+  //  }
 
   if(ROBUS_IsBumper(0))
   {
-    SERVO_SetAngle(0, 0);
+    SERVO_SetAngle(0, 30);
+
+    // delay(1000);
+
+    // TrouverBallon();
   }
   if(ROBUS_IsBumper(1))
   {
-    SERVO_SetAngle(0, 90);
+    SERVO_SetAngle(0, 170);
   }
 
-  if(ROBUS_IsBumper(0))
+  // if(ROBUS_IsBumper(0))
+  // {
+  //   LireDistance();
+  // }
+}
+
+int TrouverBallon(int *angleTourne)
+{
+  int angleTotal = 0;
+
+  Tourner(-1, 45);
+
+  Serial.println("GAUCHE : "); Serial.println(LireDistance(LEFT));
+  Serial.println("DROITE : "); Serial.println(LireDistance(RIGHT));
+
+  vitesseTourner = 0.1;
+
+  // while (LireDistance(LEFT)! <= LireDistance(RIGHT)
+  // while ((LireDistance(RIGHT) <= LireDistance(LEFT) - 2) && !(LireDistance(RIGHT) >= LireDistance(LEFT) + 2) && LireDistance(LEFT) < 25 && LireDistance(RIGHT) < 25)))
+  while((isnan(LireDistance(LEFT)) || isnan(LireDistance(RIGHT)) || ((LireDistance(RIGHT) <= LireDistance(LEFT) - 2) && !(LireDistance(RIGHT) >= LireDistance(LEFT) + 2) || LireDistance(LEFT) > 50 || LireDistance(RIGHT) > 50)))
   {
-    LireDistance();
+    Serial.println("Dans while : ");
+
+    Serial.println("GAUCHE : "); Serial.println(LireDistance(LEFT));
+    Serial.println("DROITE : "); Serial.println(LireDistance(RIGHT));
+
+	  Tourner (1, 2);
+    angleTotal = angleTotal + 2;
+    // delay(500);
   }
+
+  Serial.println("angleTotal"); Serial.println(angleTotal);
+
+  *angleTourne = angleTotal;
+
+  return (LireDistance(LEFT) + LireDistance(RIGHT)) / 2.0;
 }
 
 //Calcule l'angle le plus court que peut faire le robot en fonction de son angle initial et de la couleur qu'il veut atteindre
@@ -192,14 +300,13 @@ int CalculerAngleDepart(int *sensAngle, int angleInitial, int couleur)
   return angle;
 }
 
-float LireDistance()
+float LireDistance(int capteur) //capteur 0 = GAUCHE. capteur 1 = DROIT
 {
-  float brut = ROBUS_ReadIR(0) / 200.0;
-  float distance;
-  Serial.println(brut);
-  Serial.println(analogRead(0));
-  distance = pow(0.679454 * -1 * ((brut-49.8115) / (brut - 0.230724)), (125000.0 / 139017.0));
-  Serial.print("Distance : "); Serial.print(distance);
+  float brut = ROBUS_ReadIR(capteur) / 200.0;
+  // Serial.println(brut);
+  // Serial.println(analogRead(0));
+  float distance = pow(0.679454 * -1 * ((brut-49.8115) / (brut - 0.230724)), (125000.0 / 139017.0));
+  // Serial.print("Distance : "); Serial.print(distance);
 
   return distance;
   }
@@ -224,13 +331,13 @@ void Tourner(int dir, int Angle) //dir = -1 pour tourner a gauche et dir = 1 pou
 
     if (dir < 0)
     {
-      MOTOR_SetSpeed(0,-0.2); // Moteur gauche
-      MOTOR_SetSpeed(1, 0.2); // Moteur droit
+      MOTOR_SetSpeed(0, -vitesseTourner); // Moteur gauche
+      MOTOR_SetSpeed(1, vitesseTourner); // Moteur droit
     }
     else
     {
-      MOTOR_SetSpeed(0, 0.2); // Moteur gauche
-      MOTOR_SetSpeed(1, -0.2); // Moteur droit
+      MOTOR_SetSpeed(0, vitesseTourner); // Moteur gauche
+      MOTOR_SetSpeed(1, -vitesseTourner); // Moteur droit
     }
     //delay(75);
   }
